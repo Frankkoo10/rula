@@ -14,14 +14,9 @@ let usuario = null;
 let perfil = null;
 let saldoActual = 0;
 let fichaSeleccionada = 25;
-let apuestas = {};       // clave = id de apuesta (ver BETS) -> monto
+let apuestas = {};       // clave = id de apuesta -> monto
 let ultimaJugada = null; // para "repetir"
 let girando = false;
-
-// Registro de TODAS las apuestas posibles de la mesa: pleno, a caballo,
-// calle, esquina, linea, columna, docena, exterior y las combinaciones
-// clasicas con el 0/00. Se reconstruye cada vez que se arma la mesa.
-// id -> { numeros: [...], mult: N (paga N a 1), punto: {x, y} }
 let BETS = {};
 
 const el = (id) => document.getElementById(id);
@@ -31,7 +26,7 @@ function construirMesa() {
   const mesa = el('rl-mesa');
   mesa.innerHTML = '';
   BETS = {};
-  const refs = []; // celdas "simples" (pleno, exterior, docena, columna) para calcular su centro despues
+  const refs = [];
 
   function celda(texto, claseColor, betId, numeros, mult, gridCol, gridRow) {
     const div = document.createElement('div');
@@ -47,14 +42,10 @@ function construirMesa() {
   }
 
   // 00 (arriba) y 0 (ocupa dos filas)
-  celda('00', 'cero green', 's-00', ['00'], 35, '1', '1 / span 1');
-  celda('0', 'cero green', 's-0', ['0'], 35, '1', '2 / span 2');
+  const celda00 = celda('00', 'cero green', 's-00', ['00'], 35, '1', '1 / span 1');
+  const celda0 = celda('0', 'cero green', 's-0', ['0'], 35, '1', '2 / span 2');
 
-  // Números 1-36, 3 filas x 12 columnas. Guardamos numero y elemento de
-  // cada celda para poder ubicar despues, con precision de pixel, los
-  // puntos de apuesta a caballo / esquina / calle / linea sobre los bordes
-  // reales de la grilla (asi las fichas quedan exactamente donde se hizo
-  // click, como en una mesa real).
+  // Números 1-36 en grilla de 3 filas x 12 columnas
   const numMap = {};
   const celdaNum = {};
   for (let f = 0; f < 3; f++) {
@@ -74,8 +65,7 @@ function construirMesa() {
     celda('2:1', 'outside', 'c-' + nombresCol[f], numeros, 2, '14', String(f + 1));
   }
 
-  // Docenas (cada una cubre 4 columnas de numeros = 12 numeros reales;
-  // antes el recuadro visual quedaba corto y sólo tapaba 9 numeros)
+  // Docenas
   const docenas = [
     { label: '1st-12', id: 'doc1', desde: 1, hasta: 12, gc: '2 / 6' },
     { label: '2nd-12', id: 'doc2', desde: 13, hasta: 24, gc: '6 / 10' },
@@ -87,7 +77,7 @@ function construirMesa() {
     celda(d.label, 'outside', d.id, numeros, 2, d.gc, '4');
   });
 
-  // Apuestas externas: 1-18, PAR, ROJO, NEGRO, IMPAR, 19-36
+  // Apuestas externas (1-18, PAR, ROJO, NEGRO, IMPAR, 19-36)
   const externas = [
     { label: '1-18', id: 'low', clase: 'outside', test: (n) => n >= 1 && n <= 18 },
     { label: 'PAR', id: 'even', clase: 'outside', test: (n) => n % 2 === 0 },
@@ -103,7 +93,7 @@ function construirMesa() {
     celda(ex.label, ex.clase, ex.id, numeros, 1, `${colStart} / ${colStart + 2}`, '5');
   });
 
-  // Centro real (en pixeles) de cada celda simple, para posicionar su ficha
+  // Centro real para Plenos y Apuestas Exteriopes
   refs.forEach(({ id, elemento }) => {
     BETS[id].punto = {
       x: elemento.offsetLeft + elemento.offsetWidth / 2,
@@ -111,16 +101,11 @@ function construirMesa() {
     };
   });
 
-  construirHotspots(mesa, celdaNum, numMap);
+  construirHotspots(mesa, celdaNum, numMap, celda00, celda0);
 }
 
-// Genera los puntos de apuesta "a caballo" (split), "esquina" (corner),
-// "calle" (street) y "linea" (six line), además de las combinaciones
-// clásicas que incluyen al 0 y al 00 (splits, "canasta" y la apuesta de
-// los 5 números / top line). Todos se ubican midiendo las celdas ya
-// renderizadas, así quedan exactamente sobre los bordes/cruces reales,
-// igual que en una mesa física.
-function construirHotspots(mesa, celdaNum, numMap) {
+// Genera zonas interactivas en bordes y esquinas (A Caballo, Esquina, Calle, Línea, Ceros)
+function construirHotspots(mesa, celdaNum, numMap, celda00, celda0) {
   const capaHot = document.createElement('div');
   capaHot.className = 'rl-hotspot-layer';
   const capaFichas = document.createElement('div');
@@ -128,8 +113,8 @@ function construirHotspots(mesa, celdaNum, numMap) {
   capaFichas.id = 'rl-chip-layer';
 
   const muestra = celdaNum['0-0'];
-  const HS = Math.max(12, Math.min(muestra.offsetWidth, muestra.offsetHeight) * 0.42);
-  const HSTRA = Math.max(10, muestra.offsetHeight * 0.32);
+  const HS = Math.max(14, Math.min(muestra.offsetWidth, muestra.offsetHeight) * 0.45);
+  const HSTRA = Math.max(12, muestra.offsetHeight * 0.35);
 
   function rect(elemento) {
     return { l: elemento.offsetLeft, t: elemento.offsetTop, w: elemento.offsetWidth, h: elemento.offsetHeight };
@@ -148,7 +133,7 @@ function construirHotspots(mesa, celdaNum, numMap) {
     BETS[id] = { numeros, mult, punto: { x: x + w / 2, y: y + h / 2 } };
   }
 
-  // Splits verticales (a caballo, dentro de una misma columna de numeros)
+  // Splits verticales
   for (let c = 0; c < 12; c++) {
     for (let f = 0; f < 2; f++) {
       const ra = rect(celdaNum[c + '-' + f]);
@@ -158,7 +143,7 @@ function construirHotspots(mesa, celdaNum, numMap) {
     }
   }
 
-  // Splits horizontales (entre columnas vecinas, misma fila)
+  // Splits horizontales
   for (let f = 0; f < 3; f++) {
     for (let c = 0; c < 11; c++) {
       const ra = rect(celdaNum[c + '-' + f]);
@@ -167,7 +152,7 @@ function construirHotspots(mesa, celdaNum, numMap) {
     }
   }
 
-  // Esquinas (4 numeros que se tocan en un cruce)
+  // Esquinas (4 números)
   for (let f = 0; f < 2; f++) {
     for (let c = 0; c < 11; c++) {
       const ra = rect(celdaNum[c + '-' + f]);
@@ -178,7 +163,7 @@ function construirHotspots(mesa, celdaNum, numMap) {
     }
   }
 
-  // Calle (3 numeros de una misma columna) - franja sobre el borde inferior
+  // Calle (3 números)
   for (let c = 0; c < 12; c++) {
     const ra = rect(celdaNum[c + '-2']);
     const w = ra.w * 0.6;
@@ -186,7 +171,7 @@ function construirHotspots(mesa, celdaNum, numMap) {
       ra.l + (ra.w - w) / 2, ra.t + ra.h - HSTRA, w, HSTRA, 'linea');
   }
 
-  // Linea (6 numeros, dos calles vecinas)
+  // Línea / Seisena (6 números)
   for (let c = 0; c < 11; c++) {
     const ra = rect(celdaNum[c + '-2']);
     const w = ra.w * 0.5;
@@ -196,15 +181,14 @@ function construirHotspots(mesa, celdaNum, numMap) {
     ], 5, ra.l + ra.w - w / 2, ra.t + ra.h - HSTRA, w, HSTRA, 'linea');
   }
 
-  // Combinaciones con el 0 y el 00, ubicadas sobre el borde izquierdo de la
-  // primer columna de numeros, que es donde se tocan en una ruleta real:
-  // el 00 esta a la altura del 3, y el 0 (que ocupa dos filas) esta a la
-  // altura del 2 y del 1.
-  const r3 = rect(celdaNum['0-0']); // fila del 3, toca al 00
-  const r2 = rect(celdaNum['0-1']); // fila del 2, mitad de arriba del 0
-  const r1 = rect(celdaNum['0-2']); // fila del 1, mitad de abajo del 0
+  // Combinaciones con 0 y 00
+  const r3 = rect(celdaNum['0-0']);
+  const r2 = rect(celdaNum['0-1']);
+  const r1 = rect(celdaNum['0-2']);
+  const r00 = rect(celda00);
   const xIzq = r3.l - HS / 2;
 
+  agregar('sz-0-00', ['0', '00'], 17, r00.l + r00.w / 2 - HS / 2, r00.t + r00.h - HS / 2, HS, HS, 'punto');
   agregar('sz-00-3', ['00', '3'], 17, xIzq, r3.t + r3.h / 2 - HS / 2, HS, HS, 'punto');
   agregar('sz-0-2', ['0', '2'], 17, xIzq, r2.t + r2.h / 2 - HS / 2, HS, HS, 'punto');
   agregar('sz-0-1', ['0', '1'], 17, xIzq, r1.t + r1.h / 2 - HS / 2, HS, HS, 'punto');
@@ -279,7 +263,7 @@ function construirRueda() {
   const gradParts = [];
   const wrap = document.querySelector('.rl-wheel-wrap');
   const wrapSize = (wrap && wrap.clientWidth) || 340;
-  const labelRadius = wrapSize * 0.397; // proporción calibrada sobre el diseño original (135/340)
+  const labelRadius = wrapSize * 0.397;
 
   ORDEN_RUEDA.forEach((n, i) => {
     const desde = (i * PASO).toFixed(2);
@@ -295,14 +279,11 @@ function construirRueda() {
     wheel.appendChild(label);
   });
 
-  // Separadores metálicos (frets) entre cada casillero, como en una ruleta
-  // real: una línea fina y clara justo en el borde de cada sector. Estos
-  // "frets" son las barreras contra las que la bolita rebota antes de
-  // asentarse en un casillero exacto (ver girarRuedaHasta).
-  const grosorFret = 0.35; // grados
+  // Barreras metálicas (frets) resaltadas entre casilleros
+  const grosorFret = 0.4;
   const fretParts = ORDEN_RUEDA.map((_, i) => {
     const borde = (i * PASO).toFixed(2);
-    return `transparent ${(i * PASO - grosorFret).toFixed(2)}deg, rgba(220,190,140,.85) ${borde}deg, transparent ${(i * PASO + grosorFret).toFixed(2)}deg`;
+    return `transparent ${(i * PASO - grosorFret).toFixed(2)}deg, #e6c687 ${borde}deg, transparent ${(i * PASO + grosorFret).toFixed(2)}deg`;
   }).join(',');
 
   wheel.style.background =
@@ -312,7 +293,6 @@ function construirRueda() {
 let rotacionAcumulada = 0;
 const DURACION_GIRO_MS = 10000;
 
-// easing de deceleración fuerte (la rueda y la bolita van frenando hasta detenerse)
 function easeOutQuint(t) { return 1 - Math.pow(1 - t, 5); }
 
 function girarRuedaHasta(numeroGanador, callback) {
@@ -322,35 +302,31 @@ function girarRuedaHasta(numeroGanador, callback) {
 
   const idx = ORDEN_RUEDA.indexOf(numeroGanador);
   const centro = idx * PASO + PASO / 2;
-  const vueltasRueda = 9;
-  // el puntero está arriba (0deg); giramos para que el centro del casillero quede en 0deg
+
+  // Corrección matemática: cálculo exacto del sobrante angular acumulado
+  const currentMod = (rotacionAcumulada % 360 + 360) % 360;
+  const targetMod = (360 - centro + 360) % 360;
+  let diff = targetMod - currentMod;
+  if (diff <= 0) diff += 360;
+
+  const vueltasRueda = 8;
   const rotacionInicial = rotacionAcumulada;
-  const objetivo = vueltasRueda * 360 + (360 - centro);
-  rotacionAcumulada += objetivo;
+  rotacionAcumulada += vueltasRueda * 360 + diff;
   const rotacionFinal = rotacionAcumulada;
 
   ball.classList.remove('asentada');
   wrap.classList.add('girando');
 
-  // Radios de la pelota calculados sobre el tamaño real de la rueda (responsive)
   const wrapSize = wrap.clientWidth || 340;
-  const radioExterno = (wrapSize / 2) * 0.9;   // pegada al borde exterior, girando rápido
-  const radioFinal = wrapSize * 0.397;         // mismo radio que los números (donde "cae" en el casillero)
+  const radioExterno = (wrapSize / 2) * 0.88;
+  const radioFinal = wrapSize * 0.397;
 
-  const vueltasBolita = 13;
+  const vueltasBolita = 12;
   const anguloTotalBolita = vueltasBolita * 360;
-
   const inicio = performance.now();
 
   function frame(ahora) {
     const t = Math.min((ahora - inicio) / DURACION_GIRO_MS, 1);
-    // MISMA curva de avance para la rueda y la bolita: antes la rueda se
-    // movía con una transición CSS (otra curva) mientras la bolita se
-    // animaba con JS (otra distinta), así que podían desincronizarse y la
-    // bolita parecía "caer en cualquier lado". Ahora las dos comparten
-    // exactamente el mismo progreso en cada cuadro, así que siempre
-    // terminan alineadas: la bolita cae justo en el casillero ganador,
-    // nunca a mitad de camino entre dos números.
     const avance = easeOutQuint(t);
 
     const anguloRueda = rotacionInicial + (rotacionFinal - rotacionInicial) * avance;
@@ -358,17 +334,14 @@ function girarRuedaHasta(numeroGanador, callback) {
 
     const angulo = -(anguloTotalBolita * avance);
 
-    // Radio: se mantiene arriba (pista exterior) con un leve "traqueteo",
-    // y a partir del 55% del giro empieza a "caer" rebotando contra los
-    // separadores (frets) -las barreras- hasta asentarse exactamente en
-    // el casillero ganador, sin overshoot.
+    // Rebotar contra las barreras (frets) hasta encajar en el casillero
     let radio;
-    if (t < 0.55) {
-      const wobble = Math.sin(t * 90) * 2.5 * (1 - t);
+    if (t < 0.6) {
+      const wobble = Math.sin(t * 80) * 2 * (1 - t);
       radio = radioExterno + wobble;
     } else {
-      const v = (t - 0.55) / 0.45;
-      const rebote = Math.abs(Math.cos(v * Math.PI * 4.5)) * Math.pow(1 - v, 2.2);
+      const v = (t - 0.6) / 0.4;
+      const rebote = Math.abs(Math.cos(v * Math.PI * 5)) * Math.pow(1 - v, 2);
       radio = radioFinal + (radioExterno - radioFinal) * rebote;
     }
 
@@ -377,7 +350,7 @@ function girarRuedaHasta(numeroGanador, callback) {
     if (t < 1) {
       requestAnimationFrame(frame);
     } else {
-      // snap final exacto: rueda y bolita quedan perfectamente alineadas
+      // Snap final exacto al centro del número
       wheel.style.transform = `rotate(${rotacionFinal}deg)`;
       ball.style.transform = `rotate(0deg) translateY(-${radioFinal}px)`;
       ball.classList.add('asentada');
@@ -405,13 +378,11 @@ async function girar() {
   ultimaJugada = { ...apuestas };
   const apuestasActuales = { ...apuestas };
 
-  // Descuenta el total apostado del saldo (como en una mesa real).
   saldoActual -= total;
   await actualizarSaldoDB(saldoActual);
   await registrarTransaccion(usuario.id, 'apuesta_ruleta', -total, saldoActual, 'Apuesta en Ruleta Americana');
   pintarSaldo();
 
-  // Número random criptográficamente seguro entre los 38 casilleros.
   const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
   const numeroGanador = ORDEN_RUEDA[buf[0] % ORDEN_RUEDA.length];
@@ -464,7 +435,7 @@ function repetirApuesta() {
   actualizarResumen();
 }
 
-// ===== Supabase: saldo y perfil =====
+// ===== Supabase =====
 async function actualizarSaldoDB(nuevoSaldo) {
   await supabaseClient.from('perfiles').update({ saldo: nuevoSaldo }).eq('id', usuario.id);
 }
@@ -487,8 +458,6 @@ function bloquearJuego(motivo) {
   document.querySelectorAll('.rl-cell, .rl-hotspot').forEach((c) => c.style.pointerEvents = 'none');
 }
 
-// Si la ventana cambia de tamaño, recalculamos rueda y mesa (los puntos de
-// apuesta están medidos en píxeles) conservando las fichas ya puestas.
 let resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);

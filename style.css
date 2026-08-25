@@ -92,11 +92,6 @@ body {
   z-index: 10;
   filter: drop-shadow(0 2px 2px rgba(0,0,0,.6));
 }
-/* Contenedor único que inclina en 3D a la rueda Y al riel de la pelotita
-   al mismo tiempo. Antes cada uno tenía su propia transformación (la rueda
-   inclinada, la pelotita en un plano plano aparte), por eso a veces la
-   pelotita se veía caer "al lado" del número y no encima. Al compartir el
-   mismo rotateX, ambos se proyectan exactamente igual y coinciden siempre. */
 .rl-wheel-tilt {
   position: absolute;
   inset: 0;
@@ -111,7 +106,7 @@ body {
   border-radius: 50%;
   background: radial-gradient(circle, #7a4fae 0%, #3a1b63 70%, #1f0f3a 100%);
   border: 8px solid var(--gold-dark);
-  box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 0 20px rgba(0,0,0,.6), inset 0 0 0 2px rgba(242,193,78,.15);
+  box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 0 20px rgba(0,0,0,.6);
   position: relative;
 }
 .rl-wheel {
@@ -120,7 +115,6 @@ body {
   width: 84%; height: 84%;
   border-radius: 50%;
   transform: rotate(0deg);
-  transition: transform 10s cubic-bezier(.11,.72,.09,1);
   box-shadow: inset 0 0 12px rgba(0,0,0,.8), inset 0 0 0 3px rgba(217,166,53,.35);
 }
 .rl-wheel .rl-num {
@@ -179,7 +173,7 @@ body {
   text-align: center;
 }
 
-/* ---------- MESA ---------- */
+/* ---------- MESA Y CAPAS DE FICHAS ---------- */
 .rl-mesa-zone {
   display: flex;
   flex-direction: column;
@@ -187,6 +181,7 @@ body {
   align-items: center;
 }
 .rl-mesa {
+  position: relative; /* Esencial para posicionar hotspots y fichas */
   display: grid;
   grid-template-columns: 56px repeat(12, 1fr) 44px;
   grid-auto-rows: 40px;
@@ -219,19 +214,57 @@ body {
 .rl-cell.green { background: #0b6b3a; font-size: 0.75rem; }
 .rl-cell.outside { background: #0c3d24; border: 1px solid #2f7a4e; font-size: 0.75rem; }
 .rl-cell.cero { grid-row: span 3; font-size: 0.9rem; }
-.rl-cell .rl-chip-stack {
+
+/* Capas interactivas para apuestas compuestas */
+.rl-hotspot-layer {
   position: absolute;
-  bottom: 2px; right: 2px;
-  background: #f2c14e;
-  color: #222;
-  font-size: 0.65rem;
-  font-weight: 700;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+.rl-chip-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+.rl-hotspot {
+  position: absolute;
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 6;
   border-radius: 50%;
-  width: 20px; height: 20px;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+.rl-hotspot:hover {
+  background: rgba(242, 193, 78, 0.45);
+  box-shadow: 0 0 8px rgba(242, 193, 78, 0.9);
+}
+.rl-hotspot-linea { border-radius: 4px; }
+
+/* Fichas apostadas (alineación exacta en centros, bordes y cruces) */
+.rl-chip-stack {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 35% 30%, #f2c14e, #b8842f);
+  color: #111;
+  font-size: 0.68rem;
+  font-weight: 800;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #b8842f;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.7);
+  pointer-events: none;
+  z-index: 12;
+  animation: rl-pop-chip 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes rl-pop-chip {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
 .rl-controles {
