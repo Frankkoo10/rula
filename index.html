@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruleta Americana 3D — Victory</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="rl-top">
+    <a href="https://frankkoo10.github.io/casinou/" class="rl-back">← Volver al casino</a>
+    <h1>Ruleta Americana</h1>
+    <div class="rl-saldo-chip">
+      <span>Saldo</span>
+      <strong id="rl-saldo">$0,00</strong>
+    </div>
+  </header>
+
+  <main class="rl-main">
+    <div id="rl-aviso" class="rl-aviso hidden"></div>
+
+    <section class="rl-wheel-zone">
+      <div class="rl-wheel-wrap">
+        <div class="rl-pointer"></div>
+        <div class="rl-wheel-outer" id="rl-wheel-outer">
+          <div class="rl-wheel" id="rl-wheel"></div>
+          <div class="rl-hub"></div>
+        </div>
+        <div class="rl-ball-track" id="rl-ball-track">
+          <div class="rl-ball" id="rl-ball"></div>
+        </div>
+      </div>
+      <div class="rl-resultado" id="rl-resultado">Elegí tus fichas y apostá</div>
+    </section>
+
+    <section class="rl-mesa-zone">
+      <div class="rl-mesa" id="rl-mesa"></div>
+
+      <div class="rl-controles">
+        <div class="rl-fichas" id="rl-fichas">
+          <button type="button" class="rl-ficha" data-valor="5">5</button>
+          <button type="button" class="rl-ficha active" data-valor="25">25</button>
+          <button type="button" class="rl-ficha" data-valor="50">50</button>
+          <button type="button" class="rl-ficha" data-valor="100">100</button>
+          <button type="button" class="rl-ficha" data-valor="250">250</button>
+        </div>
+
+        <div class="rl-info-apuesta">
+          <span>Apostado: <strong id="rl-total-apostado">$0,00</strong></span>
+          <span>Posible premio: <strong id="rl-posible-premio">$0,00</strong></span>
+        </div>
+
+        <div class="rl-botones">
+          <button type="button" id="rl-limpiar" class="btn-secundario">Limpiar mesa</button>
+          <button type="button" id="rl-repetir" class="btn-secundario">Repetir</button>
+          <button type="button" id="rl-girar" class="btn-primary">GIRAR</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="shared.js"></script>
+  <script src="roulette.js"></script>
+</body>
+</html>
