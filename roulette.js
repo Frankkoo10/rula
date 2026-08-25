@@ -14,10 +14,11 @@ let usuario = null;
 let perfil = null;
 let saldoActual = 0;
 let fichaSeleccionada = 25;
-let apuestas = {};       // clave = id de apuesta -> monto
-let ultimaJugada = null; // para "repetir"
+let apuestas = {};       
+let ultimaJugada = null; 
 let girando = false;
 let BETS = {};
+let historialNumeros = [];
 
 const el = (id) => document.getElementById(id);
 
@@ -41,11 +42,9 @@ function construirMesa() {
     return div;
   }
 
-  // 00 (arriba) y 0 (ocupa dos filas)
   const celda00 = celda('00', 'cero green', 's-00', ['00'], 35, '1', '1 / span 1');
   const celda0 = celda('0', 'cero green', 's-0', ['0'], 35, '1', '2 / span 2');
 
-  // Números 1-36 en grilla de 3 filas x 12 columnas
   const numMap = {};
   const celdaNum = {};
   for (let f = 0; f < 3; f++) {
@@ -57,7 +56,6 @@ function construirMesa() {
     }
   }
 
-  // Columnas 2:1
   const nombresCol = ['col3', 'col2', 'col1'];
   for (let f = 0; f < 3; f++) {
     const numeros = [];
@@ -65,7 +63,6 @@ function construirMesa() {
     celda('2:1', 'outside', 'c-' + nombresCol[f], numeros, 2, '14', String(f + 1));
   }
 
-  // Docenas
   const docenas = [
     { label: '1st-12', id: 'doc1', desde: 1, hasta: 12, gc: '2 / 6' },
     { label: '2nd-12', id: 'doc2', desde: 13, hasta: 24, gc: '6 / 10' },
@@ -77,7 +74,6 @@ function construirMesa() {
     celda(d.label, 'outside', d.id, numeros, 2, d.gc, '4');
   });
 
-  // Apuestas externas (1-18, PAR, ROJO, NEGRO, IMPAR, 19-36)
   const externas = [
     { label: '1-18', id: 'low', clase: 'outside', test: (n) => n >= 1 && n <= 18 },
     { label: 'PAR', id: 'even', clase: 'outside', test: (n) => n % 2 === 0 },
@@ -93,101 +89,60 @@ function construirMesa() {
     celda(ex.label, ex.clase, ex.id, numeros, 1, `${colStart} / ${colStart + 2}`, '5');
   });
 
-  // Centro real para Plenos y Apuestas Exteriopes
   refs.forEach(({ id, elemento }) => {
-    BETS[id].punto = {
-      x: elemento.offsetLeft + elemento.offsetWidth / 2,
-      y: elemento.offsetTop + elemento.offsetHeight / 2,
-    };
+    BETS[id].punto = { x: elemento.offsetLeft + elemento.offsetWidth / 2, y: elemento.offsetTop + elemento.offsetHeight / 2 };
   });
 
   construirHotspots(mesa, celdaNum, numMap, celda00, celda0);
 }
 
-// Genera zonas interactivas en bordes y esquinas (A Caballo, Esquina, Calle, Línea, Ceros)
 function construirHotspots(mesa, celdaNum, numMap, celda00, celda0) {
-  const capaHot = document.createElement('div');
-  capaHot.className = 'rl-hotspot-layer';
-  const capaFichas = document.createElement('div');
-  capaFichas.className = 'rl-chip-layer';
-  capaFichas.id = 'rl-chip-layer';
-
+  const capaHot = document.createElement('div'); capaHot.className = 'rl-hotspot-layer';
+  const capaFichas = document.createElement('div'); capaFichas.className = 'rl-chip-layer'; capaFichas.id = 'rl-chip-layer';
   const muestra = celdaNum['0-0'];
-  const HS = Math.max(14, Math.min(muestra.offsetWidth, muestra.offsetHeight) * 0.45);
-  const HSTRA = Math.max(12, muestra.offsetHeight * 0.35);
+  const HS = Math.max(12, Math.min(muestra.offsetWidth, muestra.offsetHeight) * 0.45);
+  const HSTRA = Math.max(10, muestra.offsetHeight * 0.35);
 
-  function rect(elemento) {
-    return { l: elemento.offsetLeft, t: elemento.offsetTop, w: elemento.offsetWidth, h: elemento.offsetHeight };
-  }
+  function rect(elemento) { return { l: elemento.offsetLeft, t: elemento.offsetTop, w: elemento.offsetWidth, h: elemento.offsetHeight }; }
 
   function agregar(id, numeros, mult, x, y, w, h, forma) {
     const hs = document.createElement('div');
     hs.className = 'rl-hotspot rl-hotspot-' + forma;
-    hs.style.left = x + 'px';
-    hs.style.top = y + 'px';
-    hs.style.width = w + 'px';
-    hs.style.height = h + 'px';
+    hs.style.left = x + 'px'; hs.style.top = y + 'px'; hs.style.width = w + 'px'; hs.style.height = h + 'px';
     hs.title = numeros.join('-');
     hs.addEventListener('click', (e) => { e.stopPropagation(); onClickApuesta(id); });
     capaHot.appendChild(hs);
     BETS[id] = { numeros, mult, punto: { x: x + w / 2, y: y + h / 2 } };
   }
 
-  // Splits verticales
+  // Splits, Corners, etc...
   for (let c = 0; c < 12; c++) {
     for (let f = 0; f < 2; f++) {
-      const ra = rect(celdaNum[c + '-' + f]);
-      const rb = rect(celdaNum[c + '-' + (f + 1)]);
-      agregar('sv-' + c + '-' + f, [numMap[c + '-' + f], numMap[c + '-' + (f + 1)]], 17,
-        ra.l + ra.w / 2 - HS / 2, rb.t - HS / 2, HS, HS, 'punto');
+      const ra = rect(celdaNum[c + '-' + f]), rb = rect(celdaNum[c + '-' + (f + 1)]);
+      agregar('sv-' + c + '-' + f, [numMap[c + '-' + f], numMap[c + '-' + (f + 1)]], 17, ra.l + ra.w / 2 - HS / 2, rb.t - HS / 2, HS, HS, 'punto');
     }
   }
-
-  // Splits horizontales
   for (let f = 0; f < 3; f++) {
     for (let c = 0; c < 11; c++) {
       const ra = rect(celdaNum[c + '-' + f]);
-      agregar('sh-' + c + '-' + f, [numMap[c + '-' + f], numMap[(c + 1) + '-' + f]], 17,
-        ra.l + ra.w - HS / 2, ra.t + ra.h / 2 - HS / 2, HS, HS, 'punto');
+      agregar('sh-' + c + '-' + f, [numMap[c + '-' + f], numMap[(c + 1) + '-' + f]], 17, ra.l + ra.w - HS / 2, ra.t + ra.h / 2 - HS / 2, HS, HS, 'punto');
     }
   }
-
-  // Esquinas (4 números)
   for (let f = 0; f < 2; f++) {
     for (let c = 0; c < 11; c++) {
       const ra = rect(celdaNum[c + '-' + f]);
-      agregar('co-' + c + '-' + f, [
-        numMap[c + '-' + f], numMap[(c + 1) + '-' + f],
-        numMap[c + '-' + (f + 1)], numMap[(c + 1) + '-' + (f + 1)],
-      ], 8, ra.l + ra.w - HS / 2, ra.t + ra.h - HS / 2, HS, HS, 'punto');
+      agregar('co-' + c + '-' + f, [numMap[c + '-' + f], numMap[(c + 1) + '-' + f], numMap[c + '-' + (f + 1)], numMap[(c + 1) + '-' + (f + 1)]], 8, ra.l + ra.w - HS / 2, ra.t + ra.h - HS / 2, HS, HS, 'punto');
     }
   }
-
-  // Calle (3 números)
   for (let c = 0; c < 12; c++) {
-    const ra = rect(celdaNum[c + '-2']);
-    const w = ra.w * 0.6;
-    agregar('ca-' + c, [numMap[c + '-0'], numMap[c + '-1'], numMap[c + '-2']], 11,
-      ra.l + (ra.w - w) / 2, ra.t + ra.h - HSTRA, w, HSTRA, 'linea');
+    const ra = rect(celdaNum[c + '-2']), w = ra.w * 0.6;
+    agregar('ca-' + c, [numMap[c + '-0'], numMap[c + '-1'], numMap[c + '-2']], 11, ra.l + (ra.w - w) / 2, ra.t + ra.h - HSTRA, w, HSTRA, 'linea');
   }
-
-  // Línea / Seisena (6 números)
   for (let c = 0; c < 11; c++) {
-    const ra = rect(celdaNum[c + '-2']);
-    const w = ra.w * 0.5;
-    agregar('li-' + c, [
-      numMap[c + '-0'], numMap[c + '-1'], numMap[c + '-2'],
-      numMap[(c + 1) + '-0'], numMap[(c + 1) + '-1'], numMap[(c + 1) + '-2'],
-    ], 5, ra.l + ra.w - w / 2, ra.t + ra.h - HSTRA, w, HSTRA, 'linea');
+    const ra = rect(celdaNum[c + '-2']), w = ra.w * 0.5;
+    agregar('li-' + c, [numMap[c + '-0'], numMap[c + '-1'], numMap[c + '-2'], numMap[(c + 1) + '-0'], numMap[(c + 1) + '-1'], numMap[(c + 1) + '-2']], 5, ra.l + ra.w - w / 2, ra.t + ra.h - HSTRA, w, HSTRA, 'linea');
   }
-
-  // Combinaciones con 0 y 00
-  const r3 = rect(celdaNum['0-0']);
-  const r2 = rect(celdaNum['0-1']);
-  const r1 = rect(celdaNum['0-2']);
-  const r00 = rect(celda00);
-  const xIzq = r3.l - HS / 2;
-
+  const r3 = rect(celdaNum['0-0']), r2 = rect(celdaNum['0-1']), r1 = rect(celdaNum['0-2']), r00 = rect(celda00), xIzq = r3.l - HS / 2;
   agregar('sz-0-00', ['0', '00'], 17, r00.l + r00.w / 2 - HS / 2, r00.t + r00.h - HS / 2, HS, HS, 'punto');
   agregar('sz-00-3', ['00', '3'], 17, xIzq, r3.t + r3.h / 2 - HS / 2, HS, HS, 'punto');
   agregar('sz-0-2', ['0', '2'], 17, xIzq, r2.t + r2.h / 2 - HS / 2, HS, HS, 'punto');
@@ -196,20 +151,34 @@ function construirHotspots(mesa, celdaNum, numMap, celda00, celda0) {
   agregar('cz-0-1-2', ['0', '1', '2'], 11, xIzq, r2.t + r2.h - HS / 2, HS, HS, 'punto');
   agregar('cz-top-line', ['0', '00', '1', '2', '3'], 6, xIzq, r3.t - HS / 2, HS, HS, 'punto');
 
-  mesa.appendChild(capaHot);
-  mesa.appendChild(capaFichas);
+  mesa.appendChild(capaHot); mesa.appendChild(capaFichas);
 }
 
-// ===== Apuestas =====
+// ===== Lógica de Apuestas y Límites =====
+function obtenerLimite(betId, bet) {
+  if (bet.mult === 35) return 20000; // Pleno (20k)
+  if (betId === 'red' || betId === 'black' || betId.startsWith('c-')) return Infinity; // Colores y Filas/Columnas sin límite
+  return 10000; // Todo el resto (10k)
+}
+
 function onClickApuesta(betId) {
   if (girando) return;
   const bet = BETS[betId];
   if (!bet) return;
+  
+  const montoActual = apuestas[betId] || 0;
+  const limite = obtenerLimite(betId, bet);
+
+  if (montoActual + fichaSeleccionada > limite) {
+    mostrarAviso(`Límite superado. Máximo para esta zona: ${limite === Infinity ? 'Sin límite' : '$'+limite}`);
+    return;
+  }
   if (fichaSeleccionada > saldoActual - totalApostado()) {
     mostrarAviso('No te alcanza el saldo para esa ficha.');
     return;
   }
-  apuestas[betId] = (apuestas[betId] || 0) + fichaSeleccionada;
+
+  apuestas[betId] = montoActual + fichaSeleccionada;
   pintarFicha(betId);
   actualizarResumen();
 }
@@ -229,7 +198,11 @@ function pintarFicha(betId) {
     capa.appendChild(stack);
   }
   const monto = apuestas[betId];
-  stack.textContent = monto >= 1000 ? Math.round(monto / 1000) + 'k' : monto;
+  // Mostrar valores simplificados si es muy alto
+  let txt = monto;
+  if (monto >= 10000) txt = (monto/1000) + 'k';
+  else if (monto >= 1000) txt = (monto/1000).toFixed(1).replace('.0','') + 'k';
+  stack.textContent = txt;
 }
 
 function limpiarMesa() {
@@ -240,121 +213,81 @@ function limpiarMesa() {
   actualizarResumen();
 }
 
-function totalApostado() {
-  return Object.values(apuestas).reduce((a, b) => a + b, 0);
-}
+function totalApostado() { return Object.values(apuestas).reduce((a, b) => a + b, 0); }
 
 function actualizarResumen() {
   const total = totalApostado();
   el('rl-total-apostado').textContent = formatMoney(total);
-  let posible = 0;
-  Object.entries(apuestas).forEach(([id, monto]) => {
-    const bet = BETS[id];
-    if (bet) posible += monto * (bet.mult + 1);
-  });
-  el('rl-posible-premio').textContent = formatMoney(posible);
   el('rl-girar').disabled = total <= 0 || girando;
 }
 
-// ===== Rueda 3D =====
+// ===== Rueda 3D Dinámica =====
 function construirRueda() {
   const wheel = el('rl-wheel');
   wheel.innerHTML = '';
   const gradParts = [];
   const wrap = document.querySelector('.rl-wheel-wrap');
-  const wrapSize = (wrap && wrap.clientWidth) || 340;
+  // Toma el tamaño por CSS para que siempre quede proporcional
+  const wrapSize = wrap.clientWidth || 290; 
   const labelRadius = wrapSize * 0.397;
 
   ORDEN_RUEDA.forEach((n, i) => {
-    const desde = (i * PASO).toFixed(2);
-    const hasta = ((i + 1) * PASO).toFixed(2);
+    const desde = (i * PASO).toFixed(2), hasta = ((i + 1) * PASO).toFixed(2);
     const color = colorDeNumero(n) === 'green' ? '#0b6b3a' : (colorDeNumero(n) === 'red' ? '#a4123a' : '#1a1a1a');
     gradParts.push(`${color} ${desde}deg ${hasta}deg`);
-
     const label = document.createElement('div');
-    label.className = 'rl-num';
-    label.textContent = n;
+    label.className = 'rl-num'; label.textContent = n;
     const centro = i * PASO + PASO / 2;
     label.style.transform = `rotate(${centro}deg) translateY(-${labelRadius}px) rotate(${-centro}deg)`;
     wheel.appendChild(label);
   });
 
-  // Barreras metálicas (frets) resaltadas entre casilleros
   const grosorFret = 0.4;
   const fretParts = ORDEN_RUEDA.map((_, i) => {
     const borde = (i * PASO).toFixed(2);
     return `transparent ${(i * PASO - grosorFret).toFixed(2)}deg, #e6c687 ${borde}deg, transparent ${(i * PASO + grosorFret).toFixed(2)}deg`;
   }).join(',');
-
-  wheel.style.background =
-    `conic-gradient(${fretParts}), conic-gradient(${gradParts.join(',')})`;
+  wheel.style.background = `conic-gradient(${fretParts}), conic-gradient(${gradParts.join(',')})`;
 }
 
 let rotacionAcumulada = 0;
 const DURACION_GIRO_MS = 10000;
-
 function easeOutQuint(t) { return 1 - Math.pow(1 - t, 5); }
 
 function girarRuedaHasta(numeroGanador, callback) {
-  const wrap = document.querySelector('.rl-wheel-wrap');
-  const wheel = el('rl-wheel');
-  const ball = el('rl-ball');
-
-  const idx = ORDEN_RUEDA.indexOf(numeroGanador);
-  const centro = idx * PASO + PASO / 2;
-
-  // Corrección matemática: cálculo exacto del sobrante angular acumulado
+  const wrap = document.querySelector('.rl-wheel-wrap'), wheel = el('rl-wheel'), ball = el('rl-ball');
+  const idx = ORDEN_RUEDA.indexOf(numeroGanador), centro = idx * PASO + PASO / 2;
   const currentMod = (rotacionAcumulada % 360 + 360) % 360;
   const targetMod = (360 - centro + 360) % 360;
   let diff = targetMod - currentMod;
   if (diff <= 0) diff += 360;
 
-  const vueltasRueda = 8;
   const rotacionInicial = rotacionAcumulada;
-  rotacionAcumulada += vueltasRueda * 360 + diff;
+  rotacionAcumulada += 8 * 360 + diff;
   const rotacionFinal = rotacionAcumulada;
 
-  ball.classList.remove('asentada');
-  wrap.classList.add('girando');
-
-  const wrapSize = wrap.clientWidth || 340;
-  const radioExterno = (wrapSize / 2) * 0.88;
+  ball.classList.remove('asentada'); wrap.classList.add('girando');
+  
+  // Medidas dinámicas para que la bolita encaje sin importar el tamaño de pantalla
+  const wrapSize = wrap.clientWidth || 290;
+  const radioExterno = (wrapSize / 2) * 0.88; 
   const radioFinal = wrapSize * 0.397;
-
-  const vueltasBolita = 12;
-  const anguloTotalBolita = vueltasBolita * 360;
-  const inicio = performance.now();
+  const anguloTotalBolita = 12 * 360, inicio = performance.now();
 
   function frame(ahora) {
-    const t = Math.min((ahora - inicio) / DURACION_GIRO_MS, 1);
-    const avance = easeOutQuint(t);
-
-    const anguloRueda = rotacionInicial + (rotacionFinal - rotacionInicial) * avance;
-    wheel.style.transform = `rotate(${anguloRueda}deg)`;
-
+    const t = Math.min((ahora - inicio) / DURACION_GIRO_MS, 1), avance = easeOutQuint(t);
+    wheel.style.transform = `rotate(${rotacionInicial + (rotacionFinal - rotacionInicial) * avance}deg)`;
     const angulo = -(anguloTotalBolita * avance);
-
-    // Rebotar contra las barreras (frets) hasta encajar en el casillero
     let radio;
-    if (t < 0.6) {
-      const wobble = Math.sin(t * 80) * 2 * (1 - t);
-      radio = radioExterno + wobble;
-    } else {
-      const v = (t - 0.6) / 0.4;
-      const rebote = Math.abs(Math.cos(v * Math.PI * 5)) * Math.pow(1 - v, 2);
-      radio = radioFinal + (radioExterno - radioFinal) * rebote;
-    }
-
+    if (t < 0.6) { radio = radioExterno + Math.sin(t * 80) * 2 * (1 - t); } 
+    else { const v = (t - 0.6) / 0.4; radio = radioFinal + (radioExterno - radioFinal) * Math.abs(Math.cos(v * Math.PI * 5)) * Math.pow(1 - v, 2); }
     ball.style.transform = `rotate(${angulo}deg) translateY(-${radio}px)`;
 
-    if (t < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      // Snap final exacto al centro del número
+    if (t < 1) requestAnimationFrame(frame);
+    else {
       wheel.style.transform = `rotate(${rotacionFinal}deg)`;
       ball.style.transform = `rotate(0deg) translateY(-${radioFinal}px)`;
-      ball.classList.add('asentada');
-      wrap.classList.remove('girando');
+      ball.classList.add('asentada'); wrap.classList.remove('girando');
       callback();
     }
   }
@@ -365,14 +298,12 @@ function girarRuedaHasta(numeroGanador, callback) {
 async function girar() {
   if (girando) return;
   const total = totalApostado();
-  if (total <= 0) return;
-  if (total > saldoActual) {
-    mostrarAviso('No te alcanza el saldo para esta apuesta.');
+  if (total <= 0 || total > saldoActual) {
+    if (total > saldoActual) mostrarAviso('No te alcanza el saldo para esta apuesta.');
     return;
   }
 
-  girando = true;
-  el('rl-girar').disabled = true;
+  girando = true; el('rl-girar').disabled = true;
   el('rl-resultado').textContent = 'Girando...';
 
   ultimaJugada = { ...apuestas };
@@ -391,28 +322,24 @@ async function girar() {
     let premio = 0;
     Object.entries(apuestasActuales).forEach(([id, monto]) => {
       const bet = BETS[id];
-      if (bet && bet.numeros.includes(numeroGanador)) {
-        premio += monto * (bet.mult + 1);
-      }
+      if (bet && bet.numeros.includes(numeroGanador)) premio += monto * (bet.mult + 1);
     });
 
     if (premio > 0) {
       saldoActual += premio;
       await actualizarSaldoDB(saldoActual);
       await registrarTransaccion(usuario.id, 'premio_ruleta', premio, saldoActual, 'Premio Ruleta Americana - número ' + numeroGanador);
+      mostrarPremioGigante(premio);
     }
 
-    await registrarJugadaRuleta(usuario.id, {
-      numeroGanador,
-      totalApostado: total,
-      totalPremio: premio,
-      apuestas: apuestasActuales
-    });
+    await registrarJugadaRuleta(usuario.id, { numeroGanador, totalApostado: total, totalPremio: premio, apuestas: apuestasActuales });
+    
+    // Actualizar paneles laterales
+    actualizarHistorial(numeroGanador);
 
     const color = colorDeNumero(numeroGanador);
     const nombreColor = color === 'red' ? 'ROJO' : color === 'black' ? 'NEGRO' : 'VERDE';
-    el('rl-resultado').textContent = `Salió el ${numeroGanador} (${nombreColor}) — ` +
-      (premio > 0 ? `¡Ganaste ${formatMoney(premio)}!` : 'Sin premio esta vez.');
+    el('rl-resultado').textContent = `Salió el ${numeroGanador} (${nombreColor})`;
 
     pintarSaldo();
     limpiarMesa();
@@ -435,27 +362,121 @@ function repetirApuesta() {
   actualizarResumen();
 }
 
-// ===== Supabase =====
-async function actualizarSaldoDB(nuevoSaldo) {
-  await supabaseClient.from('perfiles').update({ saldo: nuevoSaldo }).eq('id', usuario.id);
+// ===== Historial y Estadísticas =====
+function actualizarHistorial(num) {
+  historialNumeros.unshift(num);
+  if (historialNumeros.length > 20) historialNumeros.pop();
+  
+  const divHistorial = el('rl-historial');
+  divHistorial.innerHTML = '';
+  historialNumeros.forEach(n => {
+    const col = colorDeNumero(n);
+    const span = document.createElement('div');
+    span.className = `hist-item hist-${col}`;
+    span.textContent = n;
+    divHistorial.appendChild(span);
+  });
+
+  // Calcular Calientes
+  const frecuencias = {};
+  historialNumeros.forEach(n => frecuencias[n] = (frecuencias[n] || 0) + 1);
+  const ordenados = Object.entries(frecuencias).sort((a,b) => b[1] - a[1]);
+  const calientes = ordenados.slice(0, 3).map(x => x[0]);
+  
+  const divCalientes = el('rl-calientes');
+  if (calientes.length > 0) {
+    divCalientes.innerHTML = calientes.map(n => `<span class="stat-hot">${n}</span>`).join(' - ');
+  }
 }
 
-function pintarSaldo() {
-  el('rl-saldo').textContent = formatMoney(saldoActual);
+// ===== Jugadas Guardadas (Memoria Local) =====
+function obtenerJugadasLocales() {
+  if (!usuario) return [];
+  const key = 'ruleta_jugadas_' + usuario.id;
+  const datos = localStorage.getItem(key);
+  return datos ? JSON.parse(datos) : [];
+}
+function guardarJugadasLocales(jugadas) {
+  if (!usuario) return;
+  localStorage.setItem('ruleta_jugadas_' + usuario.id, JSON.stringify(jugadas));
 }
 
+function renderizarJugadasGuardadas() {
+  const list = el('rl-jugadas-guardadas');
+  list.innerHTML = '';
+  const jugadas = obtenerJugadasLocales();
+  if (jugadas.length === 0) {
+    list.innerHTML = '<span style="font-size:0.8rem; color:#aaa;">No tenés jugadas guardadas.</span>';
+    return;
+  }
+  
+  jugadas.forEach((j, index) => {
+    const div = document.createElement('div');
+    div.className = 'jugada-item';
+    
+    const texto = document.createElement('span');
+    texto.textContent = j.nombre;
+    texto.style.flexGrow = '1';
+    texto.addEventListener('click', () => cargarJugada(j.apuestas));
+
+    const btnDel = document.createElement('button');
+    btnDel.className = 'jugada-btn-del';
+    btnDel.textContent = 'X';
+    btnDel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      eliminarJugada(index);
+    });
+
+    div.appendChild(texto);
+    div.appendChild(btnDel);
+    list.appendChild(div);
+  });
+}
+
+function guardarJugadaActual() {
+  const nombre = el('rl-nombre-jugada').value.trim();
+  if (!nombre) { mostrarAviso('Ponele un nombre a tu jugada'); return; }
+  if (Object.keys(apuestas).length === 0) { mostrarAviso('Poné fichas en la mesa primero'); return; }
+  
+  const jugadas = obtenerJugadasLocales();
+  jugadas.push({ nombre, apuestas: { ...apuestas } });
+  guardarJugadasLocales(jugadas);
+  el('rl-nombre-jugada').value = '';
+  renderizarJugadasGuardadas();
+}
+
+function eliminarJugada(index) {
+  const jugadas = obtenerJugadasLocales();
+  jugadas.splice(index, 1);
+  guardarJugadasLocales(jugadas);
+  renderizarJugadasGuardadas();
+}
+
+function cargarJugada(apuestasGuardadas) {
+  if (girando) return;
+  apuestas = { ...apuestasGuardadas };
+  const capa = el('rl-chip-layer');
+  if (capa) capa.innerHTML = '';
+  Object.keys(apuestas).forEach((id) => { if (BETS[id]) pintarFicha(id); });
+  actualizarResumen();
+}
+
+// ===== Utilidades y Modales =====
+async function actualizarSaldoDB(nuevoSaldo) { await supabaseClient.from('perfiles').update({ saldo: nuevoSaldo }).eq('id', usuario.id); }
+function pintarSaldo() { el('rl-saldo').textContent = formatMoney(saldoActual); }
 function mostrarAviso(msg) {
   const a = el('rl-aviso');
-  a.textContent = msg;
-  a.classList.remove('hidden');
+  a.textContent = msg; a.classList.remove('hidden');
   setTimeout(() => a.classList.add('hidden'), 3500);
 }
-
 function bloquearJuego(motivo) {
-  el('rl-aviso').textContent = motivo;
-  el('rl-aviso').classList.remove('hidden');
+  el('rl-aviso').textContent = motivo; el('rl-aviso').classList.remove('hidden');
   el('rl-girar').disabled = true;
   document.querySelectorAll('.rl-cell, .rl-hotspot').forEach((c) => c.style.pointerEvents = 'none');
+}
+function mostrarPremioGigante(monto) {
+  el('rl-premio-monto').textContent = formatMoney(monto);
+  el('rl-modal-premio').classList.remove('hidden');
 }
 
 let resizeTimer = null;
@@ -463,25 +484,21 @@ window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (girando) return;
-    construirRueda();
-    const apuestasPrevias = { ...apuestas };
-    construirMesa();
-    apuestas = {};
-    Object.entries(apuestasPrevias).forEach(([id, monto]) => {
-      if (BETS[id]) {
-        apuestas[id] = monto;
-        pintarFicha(id);
-      }
-    });
+    construirRueda(); const apuestasPrevias = { ...apuestas };
+    construirMesa(); apuestas = {};
+    Object.entries(apuestasPrevias).forEach(([id, monto]) => { if (BETS[id]) { apuestas[id] = monto; pintarFicha(id); } });
     actualizarResumen();
   }, 250);
 });
 
 // ===== Init =====
 async function init() {
-  construirRueda();
-  construirMesa();
-  actualizarResumen();
+  // Retrasamos unos ms la construcción inicial para asegurarnos que CSS calculó anchos
+  setTimeout(() => {
+    construirRueda(); 
+    construirMesa(); 
+    actualizarResumen();
+  }, 50);
 
   el('rl-fichas').addEventListener('click', (e) => {
     const btn = e.target.closest('.rl-ficha');
@@ -493,6 +510,11 @@ async function init() {
   el('rl-limpiar').addEventListener('click', limpiarMesa);
   el('rl-repetir').addEventListener('click', repetirApuesta);
   el('rl-girar').addEventListener('click', girar);
+  el('rl-btn-guardar').addEventListener('click', guardarJugadaActual);
+  
+  el('rl-btn-info').addEventListener('click', () => el('rl-modal-info').classList.remove('hidden'));
+  el('rl-btn-cerrar-info').addEventListener('click', () => el('rl-modal-info').classList.add('hidden'));
+  el('rl-btn-cerrar-premio').addEventListener('click', () => el('rl-modal-premio').classList.add('hidden'));
 
   const { data: authData } = await supabaseClient.auth.getUser();
   usuario = authData && authData.user;
@@ -510,17 +532,14 @@ async function init() {
 
   const bloqueo = timeoutActivo(perfil);
   if (bloqueo) {
-    const textos = {
-      cerrada: 'Tu cuenta está cerrada.',
-      autoexclusion: 'Tenés una autoexclusión activa.',
-      descanso: 'Estás en un descanso activo.'
-    };
+    const textos = { cerrada: 'Tu cuenta está cerrada.', autoexclusion: 'Tenés una autoexclusión activa.', descanso: 'Estás en un descanso activo.' };
     bloquearJuego(textos[bloqueo.tipo]);
     return;
   }
 
   saldoActual = Number(perfil.saldo) || 0;
   pintarSaldo();
+  renderizarJugadasGuardadas();
 }
 
 document.addEventListener('DOMContentLoaded', init);
