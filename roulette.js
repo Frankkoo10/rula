@@ -200,7 +200,17 @@ function construirRueda() {
     label.style.transform = `rotate(${centro}deg) translateY(-${labelRadius}px) rotate(${-centro}deg)`;
     wheel.appendChild(label);
   });
-  wheel.style.background = `conic-gradient(${gradParts.join(',')})`;
+
+  // Separadores metálicos (frets) entre cada casillero, como en una ruleta
+  // real: una línea fina y clara justo en el borde de cada sector.
+  const grosorFret = 0.35; // grados
+  const fretParts = ORDEN_RUEDA.map((_, i) => {
+    const borde = (i * PASO).toFixed(2);
+    return `transparent ${(i * PASO - grosorFret).toFixed(2)}deg, rgba(220,190,140,.85) ${borde}deg, transparent ${(i * PASO + grosorFret).toFixed(2)}deg`;
+  }).join(',');
+
+  wheel.style.background =
+    `conic-gradient(${fretParts}), conic-gradient(${gradParts.join(',')})`;
 }
 
 let rotacionAcumulada = 0;
@@ -221,6 +231,7 @@ function girarRuedaHasta(numeroGanador, callback) {
   const objetivo = vueltasRueda * 360 + (360 - centro);
   rotacionAcumulada += objetivo;
 
+  ball.classList.remove('asentada');
   wrap.classList.add('girando');
   wheel.style.transform = `rotate(${rotacionAcumulada}deg)`;
 
@@ -253,7 +264,11 @@ function girarRuedaHasta(numeroGanador, callback) {
       radio = radioExterno + wobble;
     } else {
       const v = (t - 0.55) / 0.45; // 0..1 en la fase de caída
-      const rebote = Math.abs(Math.cos(v * Math.PI * 3)) * Math.pow(1 - v, 2);
+      // Más rebotes (como una bolita real picando contra los frets) que
+      // se van amortiguando hasta desaparecer justo al llegar a v=1,
+      // donde el radio queda exactamente en radioFinal (mismo radio que
+      // usan los números), sin overshoot.
+      const rebote = Math.abs(Math.cos(v * Math.PI * 4.5)) * Math.pow(1 - v, 2.2);
       radio = radioFinal + (radioExterno - radioFinal) * rebote;
     }
 
@@ -263,6 +278,7 @@ function girarRuedaHasta(numeroGanador, callback) {
       requestAnimationFrame(frame);
     } else {
       ball.style.transform = `rotate(0deg) translateY(-${radioFinal}px)`;
+      ball.classList.add('asentada');
       wrap.classList.remove('girando');
       callback();
     }

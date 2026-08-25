@@ -92,6 +92,19 @@ body {
   z-index: 10;
   filter: drop-shadow(0 2px 2px rgba(0,0,0,.6));
 }
+/* Contenedor único que inclina en 3D a la rueda Y al riel de la pelotita
+   al mismo tiempo. Antes cada uno tenía su propia transformación (la rueda
+   inclinada, la pelotita en un plano plano aparte), por eso a veces la
+   pelotita se veía caer "al lado" del número y no encima. Al compartir el
+   mismo rotateX, ambos se proyectan exactamente igual y coinciden siempre. */
+.rl-wheel-tilt {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotateX(28deg);
+  transform-origin: 50% 50%;
+}
 .rl-wheel-outer {
   width: 100%;
   height: 100%;
@@ -100,8 +113,6 @@ body {
   border: 8px solid var(--gold-dark);
   box-shadow: 0 10px 30px rgba(0,0,0,.6), inset 0 0 20px rgba(0,0,0,.6), inset 0 0 0 2px rgba(242,193,78,.15);
   position: relative;
-  transform-style: preserve-3d;
-  transform: rotateX(28deg);
 }
 .rl-wheel {
   position: absolute;
@@ -149,8 +160,12 @@ body {
   background: radial-gradient(circle at 35% 30%, #fff, #ccc 60%, #888);
   box-shadow: 0 2px 4px rgba(0,0,0,.7);
   will-change: transform;
+  transition: box-shadow .25s ease;
 }
-.rl-wheel-wrap.girando .rl-wheel-outer { animation: rl-bob 10s ease-in-out; }
+.rl-ball.asentada {
+  box-shadow: 0 0 6px 2px rgba(255,255,255,.75), 0 2px 4px rgba(0,0,0,.7);
+}
+.rl-wheel-wrap.girando .rl-wheel-tilt { animation: rl-bob 10s ease-in-out; }
 @keyframes rl-bob {
   0% { transform: rotateX(28deg) translateY(0); }
   50% { transform: rotateX(30deg) translateY(-2px); }
